@@ -2,7 +2,7 @@
 - name: Install base packages
   ansible.builtin.dnf:
     name: "{{ openhands_codex_proxy_rhel_packages }}"
-    state: present
+    state: latest
 
 - name: Check Docker CE repository file
   ansible.builtin.stat:
@@ -37,4 +37,3 @@
   when:
     - openhands_codex_proxy_install_codex_cli | bool
     - openhands_codex_proxy_codex_cli_check.rc != 0
-...

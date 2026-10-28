@@ -1,10 +1,10 @@
 ---
-- name: Test openhands_codex_proxy role
+- name: Test OpenHands Codex proxy role syntax
   hosts: all
   become: true
+  gather_facts: true
   vars:
-    openhands_codex_proxy_basic_auth_user: open
-    openhands_codex_proxy_basic_auth_password: hands
+    # Lab-only fixture; do not reuse outside disposable testing.
+    openhands_codex_proxy_basic_auth_password: LabOnlyOpenHandsPassword42
   roles:
-    - joe-speedboat.openhands_codex_proxy
-...
+    - role: openhands_codex_proxy

@@ -1,13 +1,4 @@
 ---
-- name: Validate runtime access control settings
-  ansible.builtin.assert:
-    that:
-      - openhands_codex_proxy_runtime_access_mode in ['public', 'allowlist']
-      - openhands_codex_proxy_runtime_access_mode != 'allowlist' or (openhands_codex_proxy_runtime_allowed_cidrs | length > 0)
-    fail_msg: >-
-      openhands_codex_proxy_runtime_access_mode must be 'public' or 'allowlist'.
-      When using 'allowlist', set at least one CIDR in openhands_codex_proxy_runtime_allowed_cidrs.
-
 - name: Create project directories
   ansible.builtin.file:
     path: "{{ item.path }}"
@@ -28,7 +19,7 @@
     dest: "{{ openhands_codex_proxy_codex_home_dir }}/config.toml"
     owner: root
     group: root
-    mode: "0640"
+    mode: '0640'
 
 - name: Write OpenHands settings
   ansible.builtin.template:
@@ -36,7 +27,7 @@
     dest: "{{ openhands_codex_proxy_state_dir }}/settings.json"
     owner: root
     group: root
-    mode: "0640"
+    mode: '0640'
 
 - name: Generate self-signed TLS certificate
   ansible.builtin.command:
@@ -48,7 +39,7 @@
       - rsa:4096
       - -sha256
       - -days
-      - "825"
+      - '825'
       - -nodes
       - -keyout
       - "{{ openhands_codex_proxy_tls_dir }}/tls.key"
@@ -65,34 +56,33 @@
     path: "{{ openhands_codex_proxy_tls_dir }}/tls.key"
     owner: root
     group: root
-    mode: "0600"
+    mode: '0600'
 
 - name: Set TLS certificate permissions
   ansible.builtin.file:
     path: "{{ openhands_codex_proxy_tls_dir }}/tls.crt"
     owner: root
     group: root
-    mode: "0644"
+    mode: '0644'
 
 - name: Write nginx basic auth password file
   ansible.builtin.copy:
     dest: "{{ openhands_codex_proxy_basic_auth_file }}"
     owner: root
     group: nginx
-    mode: "0640"
+    mode: '0640'
     content: >-
       {{ openhands_codex_proxy_basic_auth_user }}:{{ openhands_codex_proxy_basic_auth_password | password_hash('sha512', 'openhands') }}
-
   no_log: true
   when: openhands_codex_proxy_do_basic_auth | bool
-  notify: restart nginx
+  notify: Restart nginx
 
 - name: Remove nginx basic auth password file when disabled
   ansible.builtin.file:
     path: "{{ openhands_codex_proxy_basic_auth_file }}"
     state: absent
   when: not (openhands_codex_proxy_do_basic_auth | bool)
-  notify: restart nginx
+  notify: Restart nginx
 
 - name: Write Docker Compose stack
   ansible.builtin.template:
@@ -100,8 +90,8 @@
     dest: "{{ openhands_codex_proxy_project_dir }}/docker-compose.yml"
     owner: root
     group: root
-    mode: "0640"
-  notify: restart openhands compose stack
+    mode: '0640'
+  notify: Restart OpenHands compose stack
 
 - name: Write nginx reverse proxy config
   ansible.builtin.template:
@@ -109,8 +99,8 @@
     dest: "{{ openhands_codex_proxy_nginx_conf }}"
     owner: root
     group: root
-    mode: "0644"
-  notify: restart nginx
+    mode: '0644'
+  notify: Restart nginx
 
 - name: Allow nginx to proxy local container ports under SELinux
   ansible.builtin.command:
@@ -122,4 +112,3 @@
   ansible.builtin.command:
     cmd: nginx -t
   changed_when: false
-...

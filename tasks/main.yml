@@ -1,101 +1,86 @@
 # tasks/main.yml
 ---
-######## START: Get playbooks to run ########
+- name: Set distribution fallback folder
+  ansible.builtin.set_fact:
+    ansible_distribution_combine: "{{ 'rhelAll' if ansible_distribution in ['AlmaLinux', 'Rocky', 'RedHat'] else 'dummy' }}"
 
-- name: Create rhelAll fact fallback
-  set_fact:
-    ansible_distribution_combine: dummy
+- name: Use system Python on Rocky and AlmaLinux 9
+  ansible.builtin.set_fact:
+    ansible_python_interpreter: /usr/bin/python3
+  when:
+    - ansible_distribution in ['AlmaLinux', 'Rocky']
+    - ansible_distribution_major_version | int == 9
 
-- name: Create rhelAll fact, useful when AlmaLinux, Rocky, RHEL, ... all use the same Ansible code base
-  set_fact:
-    ansible_distribution_combine: rhelAll
-  when: >
-    ansible_distribution == "AlmaLinux" or
-    ansible_distribution == "Rocky" or
-    ansible_distribution == "RedHat"
-
-- name: fix ansible_python_interpreter, for Rocky and AlmaLinux, see lib/ansible/config/base.yml
-  block:
-  - name: rhelClone v9
-    set_fact:
-      ansible_python_interpreter: /usr/bin/python3
-    when: ansible_distribution_major_version|int == 9
-  when: >
-    ansible_distribution == "AlmaLinux" or
-    ansible_distribution == "Rocky"
-
-- set_fact:
-    include_file_names: []
-
-- name: find role directory  (awx aware)
-  find:
-    paths: 
-    - /runner/requirements_roles
-    - "{{ lookup('env', 'PWD') }}/roles/{{role_path|basename}}/tasks"
-    - "{{ lookup('env', 'HOME') }}/.ansible/roles/{{role_path|basename}}/tasks"
-    - "/usr/share/ansible/roles/{{role_path|basename}}/tasks"
-    - "/etc/ansible/roles/{{role_path|basename}}/tasks"
-    - "/runner/project/roles/{{role_path|basename}}/tasks"
-    - "/runner/requirements_roles/{{role_path|basename}}/tasks"
-    recurse: no
+- name: Find this role's tasks directory
+  ansible.builtin.find:
+    paths:
+      - /runner/requirements_roles
+      - "{{ lookup('env', 'PWD') }}/roles/{{ role_path | basename }}/tasks"
+      - "{{ lookup('env', 'HOME') }}/.ansible/roles/{{ role_path | basename }}/tasks"
+      - "/usr/share/ansible/roles/{{ role_path | basename }}/tasks"
+      - "/etc/ansible/roles/{{ role_path | basename }}/tasks"
+      - "/runner/project/roles/{{ role_path | basename }}/tasks"
+      - "/runner/requirements_roles/{{ role_path | basename }}/tasks"
+      - "/workspace/ansible/roles/{{ role_path | basename }}/tasks"
+    recurse: false
     depth: 1
-    file_type: file 
-    use_regex: no 
+    file_type: file
+    use_regex: false
     patterns: main.yml
   delegate_to: localhost
-  become: no
-  run_once: True
+  become: false
+  run_once: true
   register: found_task_dirs
-  no_log: True
+  no_log: true
 
-- name: show tasks directory var
-  debug:
-    msg: "{{ 'task_dir_' + role_name|split('.')|last }}: {{ found_task_dirs.files[0].path|dirname }}"
+- name: Fail when this role's tasks directory was not found
+  ansible.builtin.fail:
+    msg: >-
+      Could not locate tasks/main.yml for role {{ role_name }}. Install the role
+      below a supported Ansible/AWX roles path or run tests from a harness that
+      symlinks roles/{{ role_path | basename }} to this checkout.
+  when: found_task_dirs.files | length == 0
+
+- name: Store this role's tasks directory in a role-scoped fact
+  ansible.builtin.set_fact:
+    "{{ 'task_dir_' + role_name | split('.') | last }}": "{{ found_task_dirs.files[0].path | dirname }}"
+
+- name: Show this role's tasks directory
+  ansible.builtin.debug:
+    msg: "{{ 'task_dir_' + role_name | split('.') | last }}: {{ vars['task_dir_' + role_name | split('.') | last] }}"
     verbosity: 1
 
-- name: define tasks directory
-  set_fact:
-    "{{ 'task_dir_' + role_name|split('.')|last }}": "{{ found_task_dirs.files[0].path|dirname }}"
-
-- name: find all task files with numeric pattern
-  find:
-    paths: "{{ vars['task_dir_' + role_name|split('.')|last] }}"
-    recurse: yes 
-    depth: 2 
-    file_type: file 
-    use_regex: yes 
+- name: Find numbered task files
+  ansible.builtin.find:
+    paths: "{{ vars['task_dir_' + role_name | split('.') | last] }}"
+    recurse: true
+    depth: 2
+    file_type: file
+    use_regex: true
     patterns: ['^[0-9]{2}_.*.yml$']
   delegate_to: localhost
-  become: no
-  run_once: True
+  become: false
+  run_once: true
   register: found_playbooks
 
-- name: trim all playbook paths
-  set_fact:
-    include_file_names: "{{ include_file_names + [ plays.path | regex_replace('.*/', '') ] }}"
-  loop: "{{ found_playbooks.files }}"
-  loop_control:
-    loop_var: plays
-  no_log: True
+- name: Build ordered task basename list in a role-scoped fact
+  ansible.builtin.set_fact:
+    "{{ 'include_file_names_' + role_name | split('.') | last }}": >-
+      {{ found_playbooks.files
+         | map(attribute='path')
+         | map('basename')
+         | unique
+         | sort
+         | list }}
 
-- name: sort and uniq
-  set_fact: 
-    include_file_names: "{{ include_file_names | unique | sort }}"
-
-- name: show playbooks
-  debug:
-    msg: "include_file_names: {{ include_file_names | unique | sort }}"
+- name: Show ordered task basename list
+  ansible.builtin.debug:
+    msg: "{{ 'include_file_names_' + role_name | split('.') | last }}: {{ vars['include_file_names_' + role_name | split('.') | last] }}"
     verbosity: 1
 
-######## END: Get playbooks to run ########
-
-
-######## START: Execution part ########
-- name: "include tasks"
-  include_tasks: "include-file.yml"
+- name: Include selected task implementation for each basename
+  ansible.builtin.include_tasks: include-file.yml
+  loop: "{{ vars['include_file_names_' + role_name | split('.') | last] }}"
   loop_control:
-    loop_var: include_file_name 
-  with_items:
-    - "{{ include_file_names }}"
-######## END: Execution part ########
+    loop_var: include_file_name
 ...

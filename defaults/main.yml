@@ -25,12 +25,13 @@ openhands_codex_proxy_pull_images: true
 openhands_codex_proxy_verify: true
 
 openhands_codex_proxy_do_basic_auth: true
-openhands_codex_proxy_basic_auth_user: open
-openhands_codex_proxy_basic_auth_password: hands
+openhands_codex_proxy_basic_auth_user: openhands
+# Required when Basic Auth is enabled. Supply via Ansible Vault or an approved
+# secret manager; the role intentionally ships no usable password default.
+openhands_codex_proxy_basic_auth_password: ''
 openhands_codex_proxy_basic_auth_realm: OpenHands
 openhands_codex_proxy_runtime_access_mode: allowlist
 openhands_codex_proxy_runtime_allowed_cidrs:
   - 10.0.0.0/8
   - 192.168.0.0/16
   - 172.16.0.0/12
-...

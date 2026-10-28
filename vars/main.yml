@@ -8,6 +8,7 @@ openhands_codex_proxy_rhel_packages:
   - policycoreutils-python-utils
   - nodejs
   - npm
+  - c-ares
   - firewalld
   - python3
 
@@ -19,4 +20,3 @@ openhands_codex_proxy_docker_packages:
   - docker-compose-plugin
 
 openhands_codex_proxy_docker_repo_url: https://download.docker.com/linux/rhel/docker-ce.repo
-...
